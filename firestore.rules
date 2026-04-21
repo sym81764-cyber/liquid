@@ -1,0 +1,108 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: stores
+// Fields:
+//   - name: string (required, < 50 chars)
+//   - slug: string (required, unique-ish validation on client)
+//   - ownerId: string (required, matches request.auth.uid)
+//   - createdAt: number (required)
+//
+// Collection: products
+// Fields:
+//   - name: string (required, < 100 chars)
+//   - price: string (required)
+//   - description: string (optional)
+//   - thumbnail: string (optional, base64 or url)
+//   - storeId: string (required, must be owned by user)
+//   - sales: number (required)
+//   - revenue: number (required)
+//
+// Collection: sales
+// Fields:
+//   - productId: string (required)
+//   - storeId: string (required)
+//   - amount: number (required)
+//   - timestamp: number (required)
+//   - customerEmail: string (required)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isStoreOwner(storeId) {
+      return isAuthenticated() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+    }
+
+    function isValidStore(data) {
+      return data.keys().hasAll(['name', 'slug', 'ownerId', 'createdAt']) &&
+             data.name is string && data.name.size() <= 50 &&
+             data.slug is string && data.slug.size() <= 30 &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 30)) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'price', 'storeId', 'sales', 'revenue']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.price is string && data.price.size() <= 20 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 5000)) &&
+             (!('whop_link' in data) || (data.whop_link is string && data.whop_link.size() <= 500)) &&
+             (!('whop_plan_id' in data) || (data.whop_plan_id is string && data.whop_plan_id.size() <= 100)) &&
+             (!('isAvailable' in data) || data.isAvailable is bool) &&
+             (!('thumbnail' in data) || (data.thumbnail is string && data.thumbnail.size() <= 1000000)) &&
+             data.storeId is string &&
+             isStoreOwner(data.storeId);
+    }
+
+    function isRecent(time) {
+      return time > (request.time.toMillis() - 60000) && time < (request.time.toMillis() + 60000);
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "sym81764@gmail.com" && request.auth.token.email_verified == true)); // Default admin
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /stores/{storeId} {
+      // Publicly readable so customers can visit Liquid.app/slug
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidStore(request.resource.data);
+      allow update: if isOwner(resource.data.ownerId) && isValidStore(request.resource.data);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow update: if isStoreOwner(resource.data.storeId) && isValidProduct(request.resource.data);
+      allow delete: if isStoreOwner(resource.data.storeId);
+    }
+
+    match /sales/{saleId} {
+      // Sales are mostly server-side or private for the store owner
+      allow read: if isAuthenticated() && isStoreOwner(resource.data.storeId);
+      // In this demo, we might allow clients to record a sale after "checkout"
+      allow create: if isAuthenticated() && isStoreOwner(request.resource.data.storeId);
+    }
+  }
+}

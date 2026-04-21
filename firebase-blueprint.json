@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "Store": {
+      "title": "Store",
+      "description": "A user's shop configuration",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the store" },
+        "slug": { "type": "string", "description": "Unique URL-friendly username" },
+        "ownerId": { "type": "string", "description": "UID of the owner" },
+        "createdAt": { "type": "number", "description": "Timestamp when created" }
+      },
+      "required": ["name", "slug", "ownerId", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A digital asset for sale",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Product name" },
+        "price": { "type": "string", "description": "Price with currency or cycle" },
+        "description": { "type": "string", "description": "HTML description" },
+        "thumbnail": { "type": "string", "description": "Base64 or URL of image" },
+        "storeId": { "type": "string", "description": "Owner store ID" },
+        "sales": { "type": "number", "description": "Number of sales" },
+        "revenue": { "type": "number", "description": "Total revenue generated" },
+        "isAvailable": { "type": "boolean", "description": "Whether the product is visible to customers" }
+      },
+      "required": ["name", "price", "storeId", "sales", "revenue", "isAvailable"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "A transaction log for analytics",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "description": "Reference to product" },
+        "storeId": { "type": "string", "description": "Reference to store" },
+        "amount": { "type": "number", "description": "Sale amount" },
+        "timestamp": { "type": "number", "description": "When the sale occurred" },
+        "customerEmail": { "type": "string", "description": "Customer email" }
+      },
+      "required": ["productId", "storeId", "amount", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/stores/{storeId}": {
+      "schema": "Store",
+      "description": "Root stores collection"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "All products across all stores"
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Transaction records for analytics"
+    }
+  }
+}
